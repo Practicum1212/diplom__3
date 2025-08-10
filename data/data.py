@@ -1,7 +1,8 @@
 BASE_URL = "https://stellarburgers.nomoreparties.site"
 
-LOGIN_URL = "https://stellarburgers.nomoreparties.site/login"  # Логин
-FEED_URL = "https://stellarburgers.nomoreparties.site/feed"  # Лента заказов
+LOGIN_URL = f"{BASE_URL}/login"  # Логин
+FEED_URL = f"{BASE_URL}/feed"  # Лента заказов
+
 
 
 EMAIL = "Paniche123@gmail.com"
