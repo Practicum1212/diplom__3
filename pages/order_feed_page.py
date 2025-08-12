@@ -1,12 +1,16 @@
 import allure
-
-from data.data import FEED_URL
-from pages.base_page import BasePage
+from .base_page import BasePage
 from locators.order_feed_page_locators import OrderFeedPageLocators
+from data.urls import FEED_URL
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import re
+
 
 class OrderFeedPage(BasePage):
     @allure.step('Открыть страницу ленты заказов')
     def open_feed(self):
+        # use FEED_URL from data.urls
         self.navigate_to(FEED_URL)
         self.find_element_with_wait(OrderFeedPageLocators.FEED_TITLE)
 
@@ -20,42 +24,35 @@ class OrderFeedPage(BasePage):
 
     @allure.step('Получить общее количество заказов')
     def get_total_orders(self):
-        return int(self.get_text(OrderFeedPageLocators.TOTAL_ORDERS_COUNTER))
+        raw = self.get_text(OrderFeedPageLocators.TOTAL_ORDERS_COUNTER)
+        # strip non-digits
+        digits = re.sub(r'\D', '', raw)
+        return int(digits) if digits else 0
 
     @allure.step('Получить количество выполненных сегодня заказов')
     def get_today_completed(self):
-        return int(self.find_element_with_wait(OrderFeedPageLocators.TODAY_COMPLETED_COUNTER, timeout=10).text.strip())
+        raw = self.find_element_with_wait(OrderFeedPageLocators.TODAY_COMPLETED_COUNTER, timeout=10).text.strip()
+        digits = re.sub(r'\D', '', raw)
+        return int(digits) if digits else 0
 
-    @allure.step('Переключиться в конструктор')
-    def click_constructor(self):
-        self.click_element(OrderFeedPageLocators.CONSTRUCTOR_BUTTON)
-
-    @allure.step('Переключиться на ленту заказов')
-    def click_feed(self):
-        self.click_element(OrderFeedPageLocators.ORDER_FEED_BUTTON)
-
-    @allure.step('Нажать кнопку "Личный кабинет"')
-    def click_account(self):
-        self.click_element(OrderFeedPageLocators.ACCOUNT_BUTTON)
-
-    @allure.step('Нажать кнопку закрытия деталей заказа')
-    def close_order_details(self):
-        self.click_element(OrderFeedPageLocators.CLOSE_ORDER_DETAILS_BUTTON)
+    @allure.step('Подождать, пока счётчик "Выполнено за сегодня" изменится')
+    def wait_until_today_completed_changes(self, old_text, timeout=30):
+        WebDriverWait(self.driver, timeout).until(
+            lambda d: d.find_element(*OrderFeedPageLocators.TODAY_COMPLETED_COUNTER).text != old_text
+        )
 
     @allure.step('Получить ID заказа из модального окна')
     def get_order_id_from_modal(self):
-        self.find_and_wait_until_text_changes(OrderFeedPageLocators.ORDER_ID, '9999')
-        return self.get_text(OrderFeedPageLocators.ORDER_ID)
+        # wait until modal order id appears and return its text
+        self.find_element_with_wait(OrderFeedPageLocators.ORDER_ID_MODAL, timeout=20)
+        return self.get_text(OrderFeedPageLocators.ORDER_ID_MODAL)
+
+    @allure.step('Закрыть окно деталей заказа')
+    def close_order_details(self):
+        self.click_element(OrderFeedPageLocators.CLOSE_ORDER_DETAILS_BUTTON)
 
     @allure.step('Проверить, что заказ отображается в ленте')
-    def is_order_in_feed(self, order_id):
-        formatted = f'{int(order_id):07d}'
-        locator = (OrderFeedPageLocators.ORDER_ID_IN_FEED[0], OrderFeedPageLocators.ORDER_ID_IN_FEED[1].format(formatted))
-        return self.is_visible(locator)
-
-    @allure.step('Проверить, что заказ в обработке')
-    def is_order_in_progress(self, order_id):
-        formatted = f'{int(order_id):07d}'
-        self.find_and_wait_until_text_changes(OrderFeedPageLocators.ORDER_IN_PROGRESS_LOCATOR, formatted)
-        return True
+    def is_order_in_feed(self, order_id: str) -> bool:
+        # format according to how order ids are displayed in feed
+        return ''.join(ch for ch in text if ch.isdigit())
 
