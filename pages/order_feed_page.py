@@ -1,9 +1,11 @@
+
+
 import allure
 from .base_page import BasePage
 from locators.order_feed_page_locators import OrderFeedPageLocators
 from data.urls import FEED_URL
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 import re
 
 
@@ -25,7 +27,6 @@ class OrderFeedPage(BasePage):
     @allure.step('Получить общее количество заказов')
     def get_total_orders(self):
         raw = self.get_text(OrderFeedPageLocators.TOTAL_ORDERS_COUNTER)
-        # strip non-digits
         digits = re.sub(r'\D', '', raw)
         return int(digits) if digits else 0
 
@@ -43,9 +44,20 @@ class OrderFeedPage(BasePage):
 
     @allure.step('Получить ID заказа из модального окна')
     def get_order_id_from_modal(self):
-        # wait until modal order id appears and return its text
-        self.find_element_with_wait(OrderFeedPageLocators.ORDER_ID_MODAL, timeout=20)
-        return self.get_text(OrderFeedPageLocators.ORDER_ID_MODAL)
+
+        if self.is_visible(OrderFeedPageLocators.ORDER_ID_TEXT, timeout=20):
+            text = self.get_text(OrderFeedPageLocators.ORDER_ID_TEXT, timeout=20)
+            assert text and text.strip(), "ORDER_ID_TEXT найден, но текст пустой"
+            return text
+
+
+        if self.is_visible(OrderFeedPageLocators.ORDER_ID, timeout=20):
+            text = self.get_text(OrderFeedPageLocators.ORDER_ID, timeout=20)
+            assert text and text.strip(), "ORDER_ID найден, но текст пустой"
+            return text
+
+
+        assert False, "Не удалось получить ID заказа из модального окна (locators: ORDER_ID_TEXT/ORDER_ID)"
 
     @allure.step('Закрыть окно деталей заказа')
     def close_order_details(self):
@@ -53,6 +65,11 @@ class OrderFeedPage(BasePage):
 
     @allure.step('Проверить, что заказ отображается в ленте')
     def is_order_in_feed(self, order_id: str) -> bool:
-        # format according to how order ids are displayed in feed
-        return ''.join(ch for ch in text if ch.isdigit())
+
+        template = OrderFeedPageLocators.ORDER_ID_IN_FEED[1]  # строка xpath с '{0}'
+        xpath = template.format(order_id)
+        locator = (By.XPATH, xpath)
+        return self.is_visible(locator, timeout=10)
+
+
 
