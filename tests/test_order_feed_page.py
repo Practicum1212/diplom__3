@@ -3,8 +3,6 @@
 import pytest
 import allure
 
-from selenium.webdriver.support.ui import WebDriverWait
-
 from data.urls import BASE_URL
 from data.data import EMAIL, PASSWORD
 from pages.account_page import AccountPage
@@ -51,9 +49,8 @@ class TestOrderFeedPage:
             allure.attach(order_id_digits, name="order_id", attachment_type=allure.attachment_type.TEXT)
 
         with allure.step("6) Ожидаем, что общий счётчик увеличится на 1 и проверяем это"):
-            WebDriverWait(driver, 30, poll_frequency=1).until(
-                lambda _drv: (order_feed_page.open_feed() or True) and order_feed_page.get_total_orders() == initial_total + 1
-            )
+
+            order_feed_page.wait_for_total_orders_to_increase(initial_total, timeout=30)
             new_total = order_feed_page.get_total_orders()
             assert new_total == initial_total + 1, (
                 f"Счётчик 'Выполнено за всё время' неверен: ожидалось {initial_total + 1}, получено {new_total}"
@@ -97,9 +94,7 @@ class TestOrderFeedPage:
             allure.attach(order_id_digits, name="order_id", attachment_type=allure.attachment_type.TEXT)
 
         with allure.step("6) Ожидаем обновления счётчика 'Выполнено за сегодня' и проверяем увеличение"):
-            WebDriverWait(driver, 30, poll_frequency=1).until(
-                lambda _drv: (order_feed_page.open_feed() or True) and order_feed_page.get_today_completed() == initial_today + 1
-            )
+            order_feed_page.wait_for_today_completed_to_increase(initial_today, timeout=30)
             current = order_feed_page.get_today_completed()
             assert current == initial_today + 1, (
                 f'Счётчик "Выполнено за сегодня" неверен: ожидалось {initial_today + 1}, получено {current}'
@@ -132,9 +127,7 @@ class TestOrderFeedPage:
 
         with allure.step("4) Закрываем модалку и ожидаем появления заказа в ленте 'В работе'"):
             order_feed_page.close_order_details()
-            WebDriverWait(driver, 30, poll_frequency=1).until(
-                lambda _drv: (order_feed_page.open_feed() or True) and order_feed_page.is_order_in_feed(order_id_digits)
-            )
+            order_feed_page.wait_until_order_appears_in_feed(order_id_digits, timeout=30)
             assert order_feed_page.is_order_in_feed(order_id_digits), (
                 f"Заказ {order_id_digits} не найден в ленте 'В работе' после оформления"
             )

@@ -1,3 +1,5 @@
+
+
 from selenium.webdriver.support import expected_conditions as EC
 from seletools.actions import drag_and_drop
 import allure
@@ -95,3 +97,26 @@ class BasePage:
         WebDriverWait(self.driver, timeout).until(
             EC.invisibility_of_element_located((By.CLASS_NAME, "Modal_modal_overlay__x2ZCr"))
         )
+
+
+    @allure.step('Ожидание выполнения условия (timeout={timeout}s)')
+    def wait_until(self, condition_fn, timeout=30, poll_frequency=1, message: str | None = None):
+
+        try:
+            return WebDriverWait(self.driver, timeout, poll_frequency).until(
+                lambda drv: condition_fn(drv)
+            )
+        except TimeoutException:
+            allure.attach(
+                self.driver.get_screenshot_as_png(),
+                name="wait_until_timeout",
+                attachment_type=allure.attachment_type.PNG
+            )
+            raise AssertionError(message or f"Условие не выполнилось за {timeout} секунд")
+
+
+
+
+
+
+

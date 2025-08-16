@@ -72,4 +72,61 @@ class OrderFeedPage(BasePage):
         return self.is_visible(locator, timeout=10)
 
 
+    @allure.step('Ожидать увеличения общего счётчика заказов на 1 (timeout={timeout}s)')
+    def wait_for_total_orders_to_increase(self, initial_total: int, timeout: int = 30):
+
+        expected = initial_total + 1
+
+        def cond(_drv):
+
+            try:
+                self.open_feed()
+            except Exception:
+
+                return False
+
+            try:
+                return self.get_total_orders() == expected
+            except Exception:
+                return False
+
+        self.wait_until(cond, timeout=timeout, message=f"Счётчик 'Выполнено за всё время' не стал {expected} за {timeout} секунд")
+        return self.get_total_orders()
+
+    @allure.step('Ожидать увеличения счётчика "Выполнено за сегодня" на 1 (timeout={timeout}s)')
+    def wait_for_today_completed_to_increase(self, initial_today: int, timeout: int = 30):
+        expected = initial_today + 1
+
+        def cond(_drv):
+            try:
+                self.open_feed()
+            except Exception:
+                return False
+
+            try:
+                return self.get_today_completed() == expected
+            except Exception:
+                return False
+
+        self.wait_until(cond, timeout=timeout, message=f"Счётчик 'Выполнено за сегодня' не стал {expected} за {timeout} секунд")
+        return self.get_today_completed()
+
+    @allure.step('Ожидать появления заказа в ленте "В работе" (timeout={timeout}s)')
+    def wait_until_order_appears_in_feed(self, order_id: str, timeout: int = 30):
+
+        def cond(_drv):
+            try:
+                self.open_feed()
+            except Exception:
+                return False
+
+            try:
+                return self.is_order_in_feed(order_id)
+            except Exception:
+                return False
+
+        self.wait_until(cond, timeout=timeout, message=f"Заказ {order_id} не появился в ленте за {timeout} секунд")
+        return True
+
+
 
