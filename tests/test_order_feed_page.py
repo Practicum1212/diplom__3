@@ -1,0 +1,175 @@
+
+
+import pytest
+import allure
+
+from data.urls import BASE_URL
+from data.data import EMAIL, PASSWORD
+from pages.account_page import AccountPage
+from pages.main_page import MainPage
+from pages.order_feed_page import OrderFeedPage
+
+
+class TestOrderFeedPage:
+    @allure.feature('Лента заказов')
+    @allure.story('Создание нового заказа обновляет счётчики')
+    @allure.title('Проверка обновления счётчика «Выполнено за всё время»')
+    @pytest.mark.ui
+    def test_order_feed_updates_and_shows_new_order(self, driver):
+        account_page = AccountPage(driver)
+        main_page = MainPage(driver)
+        order_feed_page = OrderFeedPage(driver)
+
+        with allure.step("1) Авторизация пользователя"):
+            account_page.open_login_page()
+            account_page.login(EMAIL, PASSWORD)
+
+        with allure.step("2) Открываем главную страницу и проверяем загрузку конструктора"):
+            driver.get(BASE_URL)
+            main_page.main_page_loading_wait()
+            assert main_page.is_constructor_visible(), "Секция конструктора не загружена — возможна проблема с авторизацией или страницей"
+
+        with allure.step("3) Открываем ленту и сохраняем начальное значение полного счётчика"):
+            order_feed_page.open_feed()
+            initial_total = order_feed_page.get_total_orders()
+
+        with allure.step("4) Собираем и оформляем заказ"):
+            main_page.click_constructor()
+            main_page.put_ingredient_into_basket()
+            main_page.click_place_order()
+
+            success_msg = main_page.get_order_success_message(timeout=15)
+            assert 'Ваш заказ начали готовить' in success_msg, "Ожидаем сообщение о начале приготовления заказа"
+
+        with allure.step("5) Получаем ID заказа из модалки и закрываем её"):
+            order_id_text = order_feed_page.get_order_id_from_modal()
+            order_id_digits = ''.join(ch for ch in order_id_text if ch.isdigit())
+            assert order_id_digits, f"Не удалось извлечь цифровой ID из текста: '{order_id_text}'"
+            order_feed_page.close_order_details()
+            allure.attach(order_id_digits, name="order_id", attachment_type=allure.attachment_type.TEXT)
+
+        with allure.step("6) Ожидаем, что общий счётчик увеличится на 1 и проверяем это"):
+
+            order_feed_page.wait_for_total_orders_to_increase(initial_total, timeout=30)
+            new_total = order_feed_page.get_total_orders()
+            assert new_total == initial_total + 1, (
+                f"Счётчик 'Выполнено за всё время' неверен: ожидалось {initial_total + 1}, получено {new_total}"
+            )
+
+    @allure.feature('Лента заказов')
+    @allure.story('Создание нового заказа обновляет счётчик "Выполнено за сегодня"')
+    @allure.title('Проверка увеличения счётчика «Выполнено за сегодня»')
+    @pytest.mark.ui
+    def test_today_completed_counter_increments_and_order_in_progress(self, driver):
+        account_page = AccountPage(driver)
+        main_page = MainPage(driver)
+        order_feed_page = OrderFeedPage(driver)
+
+        with allure.step("1) Авторизация пользователя"):
+            account_page.open_login_page()
+            account_page.login(EMAIL, PASSWORD)
+
+        with allure.step("2) Переход на главную страницу и проверка конструктора"):
+            driver.get(BASE_URL)
+            main_page.main_page_loading_wait()
+            assert main_page.is_constructor_visible(), "Конструктор не виден — вход мог не выполниться"
+
+        with allure.step("3) Открываем ленту и сохраняем текущее значение 'Выполнено за сегодня'"):
+            order_feed_page.open_feed()
+            initial_today = order_feed_page.get_today_completed()
+
+        with allure.step("4) Собираем и оформляем заказ"):
+            main_page.click_constructor()
+            main_page.put_ingredient_into_basket()
+            main_page.click_place_order()
+
+            success_msg = main_page.get_order_success_message(timeout=15)
+            assert 'Ваш заказ начали готовить' in success_msg, "Сообщение о начале приготовления отсутствует"
+
+        with allure.step("5) Получаем ID и закрываем модалку"):
+            order_id_text = order_feed_page.get_order_id_from_modal()
+            order_id_digits = ''.join(ch for ch in order_id_text if ch.isdigit())
+            assert order_id_digits, f'Некорректный ID заказа: "{order_id_text}"'
+            order_feed_page.close_order_details()
+            allure.attach(order_id_digits, name="order_id", attachment_type=allure.attachment_type.TEXT)
+
+        with allure.step("6) Ожидаем обновления счётчика 'Выполнено за сегодня' и проверяем увеличение"):
+            order_feed_page.wait_for_today_completed_to_increase(initial_today, timeout=30)
+            current = order_feed_page.get_today_completed()
+            assert current == initial_today + 1, (
+                f'Счётчик "Выполнено за сегодня" неверен: ожидалось {initial_today + 1}, получено {current}'
+            )
+
+    @allure.feature("Лента заказов")
+    @allure.story("После оформления заказа его номер появляется в разделе 'В работе'")
+    @allure.title("Проверка появления номера заказа в разделе 'В работе'")
+    @pytest.mark.ui
+    def test_order_appears_in_in_progress(self, driver):
+        account_page = AccountPage(driver)
+        main_page = MainPage(driver)
+        order_feed_page = OrderFeedPage(driver)
+
+        with allure.step("1) Авторизация и переход на главную"):
+            account_page.open_login_page()
+            account_page.login(EMAIL, PASSWORD)
+            driver.get(BASE_URL)
+            main_page.main_page_loading_wait()
+
+        with allure.step("2) Добавляем ингредиенты и оформляем заказ"):
+            main_page.put_ingredient_into_basket()
+            main_page.click_place_order()
+
+        with allure.step("3) Получаем ID из модалки и прикрепляем к отчету"):
+            order_id_text = order_feed_page.get_order_id_from_modal()
+            order_id_digits = ''.join(ch for ch in order_id_text if ch.isdigit())
+            assert order_id_digits, f"Не удалось извлечь цифры из текста: '{order_id_text}'"
+            allure.attach(order_id_digits, name="order_id", attachment_type=allure.attachment_type.TEXT)
+
+        with allure.step("4) Закрываем модалку и ожидаем появления заказа в ленте 'В работе'"):
+            order_feed_page.close_order_details()
+            order_feed_page.wait_until_order_appears_in_feed(order_id_digits, timeout=30)
+            assert order_feed_page.is_order_in_feed(order_id_digits), (
+                f"Заказ {order_id_digits} не найден в ленте 'В работе' после оформления"
+            )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
